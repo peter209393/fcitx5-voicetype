@@ -27,6 +27,16 @@ from faster_whisper import WhisperModel
 ASR_MODEL = os.environ.get("VT_ASR_MODEL", "medium")
 ASR_DEVICE = os.environ.get("VT_ASR_DEVICE", "cpu")
 ASR_COMPUTE_TYPE = os.environ.get("VT_ASR_COMPUTE_TYPE", "int8")
+# Decoding knobs. Whisper picks ONE language per 30 s window, so mixed
+# Chinese/English speech often loses the English half; a bilingual
+# initial prompt and a wider beam noticeably help code-switching.
+ASR_BEAM = int(os.environ.get("VT_ASR_BEAM", "5"))
+ASR_LANGUAGE = os.environ.get("VT_ASR_LANGUAGE") or None  # e.g. "zh", "en"
+ASR_PROMPT = os.environ.get(
+    "VT_ASR_PROMPT",
+    "以下是普通话和 English 混合的语音输入，技术术语保留英文，例如：我用 Rust 写了一个 "
+    "Wayland 上的 voice typing 工具，然后 push 到 GitHub。",
+)
 
 app = FastAPI(title="voice-type asr")
 
@@ -49,7 +59,7 @@ def get_model() -> WhisperModel:
 
 @app.get("/healthz")
 def healthz() -> dict:
-    return {"status": "ok", "model": ASR_MODEL}
+    return {"status": "ok", "model": ASR_MODEL, "beam": ASR_BEAM, "language": ASR_LANGUAGE}
 
 
 @app.post("/v1/audio/transcriptions")
@@ -61,8 +71,10 @@ async def transcriptions(file: UploadFile = File(...)) -> JSONResponse:
     segments, _info = get_model().transcribe(
         io.BytesIO(data),
         vad_filter=True,
-        beam_size=1,
-        language=None,
+        beam_size=ASR_BEAM,
+        language=ASR_LANGUAGE,
+        initial_prompt=ASR_PROMPT or None,
+        condition_on_previous_text=False,
         task="transcribe",
     )
     # segments is a generator; materialize it.

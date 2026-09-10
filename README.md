@@ -13,10 +13,9 @@ No dictation windows, no clicking — Voice Type turns any focused input box (br
 ## Features
 
 - 🗣️ **Real-time voice typing** — streaming ASR partials are typed live while you speak; no waiting for release
-- ✨ **Fast LLM correction** — after release, a non-thinking Doubao model (VolcEngine Ark) fixes homophones, punctuation and filler words, then quietly replaces the text
 - ⌨️ **Push-to-talk hotkey** — hold **Alt** / **Option** to record, release to finish
 - 🔁 **Self-correcting** — when the recognizer rewrites earlier words, the divergence is backspaced and retyped
-- ☁️ **Cloud ASR by default** — VolcEngine streaming (same engine & key as the [`pi-voice-input`](https://github.com/tr-nc/pi-voice-input) extension), with punctuation & ITN
+- ☁️ **Cloud ASR by default** — 豆包流式语音识别 2.0 (Seed-ASR) via VolcEngine, two-pass recognition, punctuation & ITN; accurate on Chinese/English mixed speech without any LLM post-processing
 - 🏠 **Offline fallback** — local [faster-whisper](https://github.com/SYSTRAN/faster-whisper) server when the cloud is unavailable
 - 🎨 **State-aware tray icon** — procedurally rendered, independent of the icon theme
 - 🖥️ **Cross-platform, single binary** — Linux (Wayland/X11) & macOS, no Electron
@@ -45,6 +44,8 @@ export VT_VOLC_API_KEY="your-key"            # or see Configuration
 ```
 
 Get a VolcEngine key at <https://console.volcengine.com/speech/new/setting/apikeys?projectName=default>, or go fully offline with the [faster-whisper server](#local-offline-fallback-faster-whisper).
+
+> **Get 豆包流式语音识别模型 2.0** — it is markedly better at English and Chinese/English code-switching. Two ways: (a) enable it for the key's project in the speech console, or (b) subscribe to a 火山方舟 Agent/Coding Plan, turn on 超额后付费 for the speech models, and set the plan's API key as `VT_ARK_API_KEY` (or `VT_ARK_PLAN_API_KEY`) — no speech-console key needed at all. Voice Type tries the plan gateway first, then the speech console with 2.0, then 1.0; the startup line `[vt] VolcEngine ASR: model 2.0 (seedasr) via ark-plan …` confirms which route is active.
 
 ## Usage
 
@@ -89,14 +90,21 @@ First run downloads the model (~1.5 GB for `medium`, cached in `~/.cache/hugging
 |----------|---------|-------------|
 | `VT_ASR_PROVIDER` | `auto` | `auto` (VolcEngine when keyed, else whisper), `volc`, `whisper` |
 | `VT_VOLC_API_KEY` | unset | VolcEngine key via env var — takes precedence over any config file |
-| `VT_VOLC_BOOSTING_TABLE_ID` | unset | VolcEngine hotwords table id |
-| `VT_ARK_API_KEY` | unset | VolcEngine Ark (ByteDance LLM) key — enables fast post-release transcript correction (homophones, punctuation, fillers) |
-| `VT_CORRECT_MODEL` | `doubao-seed-2-1-turbo-260628` | Ark model for correction — use a fast *non-thinking* model (thinking is auto-disabled for seed/1.6 models) |
-| `VT_CORRECT` | `1` | Set `0`/`off` to disable correction even when a key exists |
+| `VT_VOLC_PLAN` | auto | Route ASR through the 火山方舟 Agent/Coding Plan gateway (`…/api/v3/plan/sauc/`), billed to the plan (超额后付费). Auto = try it first whenever an Ark key is set; `0` never, `1` only |
+| `VT_ARK_PLAN_API_KEY` / `VT_ARK_API_KEY` | unset | 火山方舟 (Ark) plan API key for the plan gateway; the first one set wins |
+| `VT_VOLC_WS_BASE` | `wss://openspeech.bytedance.com/api/v3/sauc/` | Override the speech-console gateway base URL |
+| `VT_VOLC_RESOURCE_ID` | auto | `X-Api-Resource-Id`. Auto tries 豆包流式语音识别模型 **2.0** (`volc.seedasr.sauc.duration`, best for Chinese/English mixing) and falls back to 1.0 (`volc.bigasr.sauc.duration`) if the key is not enabled for it |
+| `VT_VOLC_MODE` | `async` | `async` = `bigmodel_async` (optimized, supports two-pass) · `stream` = legacy `bigmodel` |
+| `VT_VOLC_TWO_PASS` | `1` | Two-pass recognition: live partials from the streaming model, each finished sentence re-recognized by the non-streaming model (more accurate final text). `0` to disable |
+| `VT_VOLC_END_WINDOW_MS` | server default (800) | Silence that ends a sentence and triggers its two-pass re-recognition; min 200. Lower = earlier fixes, more splits |
+| `VT_VOLC_HOTWORDS` | unset | Comma-separated hotwords sent inline (names, products, jargon; ≈100 tokens max), e.g. `Rust,Wayland,sway,tokio` |
+| `VT_VOLC_CONTEXT` | unset | Free-text context for the recognizer, e.g. `我是程序员，中英混说，常用术语是 Rust、Linux、Wayland` |
+| `VT_VOLC_BOOSTING_TABLE_ID` | unset | VolcEngine hotwords table id (自学习平台) |
 | `VT_VOLC_CONFIG` | `~/.pi/agent/voice-input.config.json` | Shared pi-voice-input config file |
 | `VT_ASR_URL` | `http://127.0.0.1:8000` | faster-whisper server URL |
-| `VT_ASR_MODEL` | `medium` | faster-whisper model (`tiny`…`large-v3`) |
+| `VT_ASR_MODEL` | `medium` | faster-whisper model (`tiny`…`large-v3`, `large-v3-turbo` recommended for zh/en mixing) |
 | `VT_ASR_DEVICE` / `VT_ASR_COMPUTE_TYPE` | `cpu` / `int8` | CTranslate2 device / compute type |
+| `VT_ASR_BEAM` / `VT_ASR_LANGUAGE` / `VT_ASR_PROMPT` | `5` / auto / bilingual sample | faster-whisper beam size, forced language (`zh`/`en`), initial prompt that biases code-switching |
 | `VT_LOG` | unset | Any non-empty value = verbose debug logging |
 
 ## Autostart
@@ -138,6 +146,8 @@ systemctl --user enable --now voice-type
 | Right Alt doesn't work as Alt/AltGr | Expected while running (remapped to F13); restored on exit |
 | Key still remapped after a crash | Graceful-kill the app on next run, replug keyboard, or reboot |
 | Live partials missing | Check the VolcEngine key; debug with `VT_LOG=1` |
+| English / mixed speech inaccurate | Get ASR model 2.0 (plan or console, see Install; look for `model 1.0` in the startup log), add `VT_VOLC_HOTWORDS` / `VT_VOLC_CONTEXT`, keep `VT_VOLC_TWO_PASS=1` |
+| `45000010 … call ark get status code:401` | The plan gateway accepted the connection but 方舟 rejected the key: use the **plan** API key (`VT_ARK_PLAN_API_KEY`) and make sure 超额后付费 is on for the speech models |
 | No tray icon | Bar must support StatusNotifierItem (waybar etc.) |
 | macOS: typing doesn't work | Grant Accessibility permissions |
 
