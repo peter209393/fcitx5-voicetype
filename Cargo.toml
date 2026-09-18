@@ -1,35 +1,21 @@
 [package]
-name = "voice-type"
-version = "0.1.0"
+name = "fcitx5-voicetype"
+version = "0.2.0"
 edition = "2021"
+description = "Core of the fcitx5-voicetype addon: microphone capture + 豆包 streaming ASR"
+license = "MIT"
 
-[features]
-default = []
-gtk-tray = ["dep:libappindicator"]
+[lib]
+name = "voice_type_core"
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-anyhow = "1.0"
-crossbeam-channel = "0.5"
+anyhow = "1"
 cpal = "0.15"
-hound = "3.5"
-serde_json = "1.0"
-which = "6"
-reqwest = { version = "0.12", features = ["multipart", "stream", "json"] }
-tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time", "net", "io-util", "sync"] }
-futures-util = { version = "0.3", features = ["sink"] }
 flate2 = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "time", "net", "sync"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 uuid = { version = "1", features = ["v4"] }
-tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-evdev = "0.12"
-ksni = "0.2"
-gtk = "0.18"
-libc = "0.2"
-libappindicator = { version = "0.9", optional = true }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-rdev = "0.5"
-enigo = "0.3"
-objc = "0.2"
-core-graphics = "0.24"
