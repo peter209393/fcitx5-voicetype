@@ -8,6 +8,7 @@
 #include <fcitx-config/configuration.h>
 #include <fcitx-config/option.h>
 #include <fcitx-utils/event.h>
+#include <fcitx-utils/eventdispatcher.h>
 #include <fcitx-utils/key.h>
 #include <fcitx/addoninstance.h>
 #include <fcitx/event.h>
@@ -82,6 +83,8 @@ private:
 
     fcitx::Instance *instance_;
     VoiceTypeConfig config_;
+    // Own dispatcher: Instance::eventDispatcher() only exists since 5.1.9.
+    fcitx::EventDispatcher dispatcher_;
     std::vector<std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>>>
         handlers_;
     std::unique_ptr<fcitx::EventSourceTime> clearTimer_;

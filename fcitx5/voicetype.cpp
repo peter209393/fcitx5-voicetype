@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include <fcitx-config/iniparser.h>
-#include <fcitx-utils/eventdispatcher.h>
 #include <fcitx-utils/log.h>
 #include <fcitx-utils/utf8.h>
 #include <fcitx/addonfactory.h>
@@ -17,6 +16,7 @@ using namespace fcitx;
 static constexpr char CONF_PATH[] = "conf/voicetype.conf";
 
 VoiceType::VoiceType(Instance *instance) : instance_(instance) {
+    dispatcher_.attach(&instance_->eventLoop());
     reloadConfig();
     handlers_.emplace_back(instance_->watchEvent(
         EventType::InputContextKeyEvent, EventWatcherPhase::PreInputMethod,
@@ -31,7 +31,10 @@ VoiceType::VoiceType(Instance *instance) : instance_(instance) {
         }));
 }
 
-VoiceType::~VoiceType() { stop(); }
+VoiceType::~VoiceType() {
+    stop();
+    dispatcher_.detach();
+}
 
 void VoiceType::reloadConfig() {
     readAsIni(config_, CONF_PATH);
@@ -110,7 +113,7 @@ void VoiceType::stop() {
 void VoiceType::onCoreEvent(void *user, int kind, const char *text) {
     auto *ctx = static_cast<Ctx *>(user);
     auto *self = ctx->self;
-    self->instance_->eventDispatcher().schedule(
+    self->dispatcher_.schedule(
         [self, gen = ctx->gen, kind, s = std::string(text ? text : "")] {
             self->handleEvent(gen, kind, s);
         });
@@ -195,4 +198,8 @@ public:
     }
 };
 
+#ifdef FCITX_ADDON_FACTORY_V2
 FCITX_ADDON_FACTORY_V2(voicetype, VoiceTypeFactory);
+#else
+FCITX_ADDON_FACTORY(VoiceTypeFactory);
+#endif
