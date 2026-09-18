@@ -4,7 +4,7 @@
 
 No daemon, no tray icon, no fake keyboard: it is a regular fcitx5 module. Partial results show up as **preedit** while you talk; the final transcript is **committed** when you release the key. Works wherever fcitx5 works (Wayland, X11, any toolkit) and alongside your normal input method (pinyin, keyboard, …).
 
-[![CI](https://github.com/YouNeedWork/fcitx5-voicetype/actions/workflows/ci.yml/badge.svg)](https://github.com/YouNeedWork/fcitx5-voicetype/actions/workflows/ci.yml)
+[![CI](https://github.com/peter209393/fcitx5-voicetype/actions/workflows/ci.yml/badge.svg)](https://github.com/peter209393/fcitx5-voicetype/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%2F%20fcitx5%20%E2%89%A5%205.1-informational)
 
