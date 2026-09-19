@@ -93,6 +93,20 @@ Layout: `src/` Rust core (`lib.rs` C ABI, `audio.rs` capture, `volc.rs` protocol
 
 - **Nothing happens when holding the key.** Run `python3 scripts/ictest.py 4` while speaking: it drives the addon through fcitx5's DBus frontend and prints what fcitx5 sends back (`UpdateFormattedPreedit` partials, `CommitString` final). If it prints `press handled = False`, the hotkey did not match: the `[Hotkey]` section must be a list (`0=Alt_R`), not `Hotkey=Alt_R`.
 - **Check the log.** Start fcitx5 in a terminal (`fcitx5 -r`) and look for `voicetype: hotkeys …` at startup (config loaded) and `voicetype: session started` / `final …` per utterance. Errors from the recognizer or microphone are logged with `voicetype:` too.
+- **`failed to build input stream: ALSA function 'snd_pcm_hw_params' failed with 'No such file or directory'`** — despite the message this is usually not a parameter problem but PipeWire failing to link the stream. Bisect layer by layer: `arecord -D pipewire -f FLOAT_LE -r 44100 -c 2 -d 1 t.wav` reproduces it below fcitx5, and `pw-record -d 1 t.wav` bypasses the ALSA plugin entirely. If `pw-record` says `no target node available`, WirePlumber has no usable default source: set one with `wpctl set-default <id>` (`wpctl status` lists Sources). If the mic's ports show `not available` (`pactl list sources` — no jack detected), WirePlumber refuses to default to it; pin the node in `~/.asoundrc` instead and point `AudioDevice` at it:
+  ```
+  pcm.pwmic_raw {
+      type pipewire
+      capture_node "alsa_input.pci-....analog-stereo"   # node.name, see pw-dump
+  }
+  pcm.pwmic {
+      type plug          # accept any rate/channels, convert for the plugin
+      slave.pcm "pwmic_raw"
+      hint { show on description "Mic via PipeWire (pinned)" }
+  }
+  ```
+  As a last resort `AudioDevice=sysdefault` captures straight from the hardware (works, but exclusively — no other app can use the mic meanwhile).
+- **Isolate the audio layer.** `cargo run --example probe <name-substring>` enumerates input devices, prints which one matches and the negotiated config, and builds a stream exactly like the addon does — no fcitx5 involved. Handy for telling an audio problem apart from an fcitx5 problem.
 - **After upgrading fcitx5** rebuild and reinstall the addon, then restart fcitx5 — a running fcitx5 whose libraries were replaced underneath tends to crash on the next restart.
 
 ## License
